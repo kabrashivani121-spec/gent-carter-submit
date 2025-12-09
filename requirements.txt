@@ -1,23 +1,31 @@
 streamlit==1.52.1
+
+# Core
 pandas==2.2.2
 numpy==1.26.4
 python-dotenv==1.0.0
 
-openai==1.54.3
+# OpenAI (stable + works with LangChain + Exa)
+openai==2.9.0
+
+# Semantic embeddings (NO TORCH NEEDED)
+sentence-transformers==2.2.2
+onnxruntime==1.17.0
+
+# EXA Search
 exa-py==2.0.1
 
+# Database
 SQLAlchemy==2.0.44
-pyarrow==14.0.1
+pyarrow==12.0.0
 lancedb==0.4.1
 
-sentence-transformers==2.2.0
-torch==2.0.1
-transformers==4.30.2
-
+# Google APIs
 google-auth==2.41.1
 google-auth-oauthlib==1.2.3
 google-api-python-client==2.187.0
 
+# Utilities
 requests==2.32.3
 tqdm==4.67.1
 protobuf==4.25.3
