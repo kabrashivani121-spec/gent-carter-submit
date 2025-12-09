@@ -3,38 +3,48 @@ import numpy as np
 import pyarrow as pa
 import lancedb
 from lancedb import connect
-from sentence_transformers import SentenceTransformer
+from openai import OpenAI
 
 DB_DIR = "agent_carter_lancedb"
-MODEL_NAME = "all-MiniLM-L6-v2"
+EMBED_MODEL = "text-embedding-3-small"
+EMBED_DIM = 1536   # OpenAI embedding dimension
 
-_model = None
-
+# OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # -------------------------------------------------
-# MODEL LOADING
+# MODEL LOADING — not needed for OpenAI but kept for API symmetry
 # -------------------------------------------------
 def _get_model():
-    global _model
-    if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
-    return _model
+    return EMBED_MODEL
 
 
+# -------------------------------------------------
+# EMBEDDINGS
+# -------------------------------------------------
 def embed(texts):
-    m = _get_model()
-    vecs = m.encode(texts, convert_to_numpy=True)
-    return vecs.astype(np.float32)
+    """
+    Returns a list of embedding vectors for a list of input strings.
+    """
+    response = client.embeddings.create(
+        model=EMBED_MODEL,
+        input=texts
+    )
+    vectors = [np.array(e.embedding, dtype=np.float32) for e in response.data]
+    return np.vstack(vectors)
 
 
 def embed_query(text: str):
+    """
+    Returns a single embedding vector for one input string.
+    """
     return embed([text])[0].tolist()
 
 
 # -------------------------------------------------
-# LANCE DB SCHEMA
+# LANCE DB SCHEMA (UPDATED for dim=1536)
 # -------------------------------------------------
-def lancedb_schema(dim=384):
+def lancedb_schema(dim=EMBED_DIM):
     return pa.schema([
         ("id", pa.string()),
         ("profile_summary", pa.string()),
@@ -42,10 +52,9 @@ def lancedb_schema(dim=384):
             ("name", pa.string()),
             ("headline", pa.string()),
             ("linkedin", pa.string()),
-            ("profile_summary", pa.string()),    # ← REQUIRED BY db_ops
+            ("profile_summary", pa.string()),
         ])),
-       ("vector", pa.list_(pa.float32(), list_size=384))
-
+        ("vector", pa.list_(pa.float32(), list_size=dim))
     ])
 
 
@@ -65,17 +74,14 @@ def _get_db():
 # -------------------------------------------------
 # GET OR CREATE TABLE
 # -------------------------------------------------
-
 def get_contacts_table(user_id=None):
     db = lancedb.connect(DB_DIR)
 
     table_name = f"{user_id}_contacts" if user_id else "contacts"
     schema = lancedb_schema()
 
-    # If missing → CREATE TABLE
     if table_name not in db.table_names():
         print(f"[LanceDB] Creating new table: {table_name}")
         return db.create_table(table_name, schema=schema)
 
-    # If exists → RETURN table
     return db.open_table(table_name)
